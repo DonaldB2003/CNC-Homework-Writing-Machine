@@ -1,39 +1,57 @@
 # 2D CNC Writing Machine (GRBL + Arduino Uno)
 
-A DIY 2D CNC writing/plotting machine built on an Arduino Uno + CNC Shield running GRBL, with pen up/down control via an SG90 servo.
+A DIY 2D CNC writing/plotting machine (EasyDraw V2-style CoreXY plotter) built on an Arduino Uno + CNC Shield running GRBL, with pen up/down control via an MG90S servo.
 
-![Finished machine](photos/machine-overview.jpg)
+![Parts kit](photos/parts-kit.jpg)
 
 ## Overview
 
-- **Controller:** Arduino Uno + CNC Shield
-- **Firmware:** GRBL 0.9j (CoreXY-patched) for motion, `robottini/grbl-servo` fork for pen-lift servo control
+- **Controller:** Arduino Uno + CNC Shield (A4988 drivers)
+- **Firmware:** GRBL (CoreXY-patched) for motion, [`grbl-servo`](grbl-servo-master.zip) fork for pen-lift servo control
 - **Kinematics:** CoreXY
-- **Pen actuator:** SG90 micro servo
-- **G-code source:** Inkscape + Gcodetools extension
+- **Pen actuator:** MG90S micro servo
+- **G-code source:** Inkscape 0.92 + Gcodetools extension
+- **G-code sender:** Universal G-code Sender (UGS)
 
-## Table of Contents
+## Component List
 
-- [Hardware](#hardware)
-- [The Diagonal Movement Problem](#the-diagonal-movement-problem)
-- [Firmware Setup](#firmware-setup)
-- [Servo Pen-Lift Setup](#servo-pen-lift-setup)
-- [G-code Scaling Fix](#g-code-scaling-fix)
-- [Speed Tuning](#speed-tuning)
-- [Final Settings](#final-settings)
-- [Gallery](#gallery)
+| Component | Quantity | Notes / Source |
+|---|---|---|
+| Arduino Uno | 1 | Main controller |
+| CNC Shield v3 | 1 | Stepper driver breakout board |
+| A4988 stepper motor driver | 2 | One per axis (X/Y) |
+| NEMA 17 stepper motor | 2 | X and Y axis drive |
+| GT2 timing pulley + belt | 2 sets | CoreXY belt drive |
+| M8 threaded rod (smooth/non-threaded) | 4 pcs | Linear motion rails |
+| M8 linear bearing (LM8UU) | 8 pcs | Rides on the M8 rods |
+| 3D printed parts kit (ABS) | 1 kit | [EasyDraw V2 2D Plotter parts kit – shopmakerq.com](https://shopmakerq.com/product/cnc-plotter-3d-printed-parts-kit/?srsltid=AfmBOorJEgRL87GRTpUh_m8fN5zNQv1IVdzcSez_7XhsyYk16ucyBQryKzo) (paid) — **or** print the free STL files yourself, see [Free 3D Model Alternative](#free-3d-model-alternative) below |
+| MG90S servo motor | 1 | Pen up/down actuator |
+| 12V 5A power adapter | 1 | Main power supply |
+| USB cable (Arduino Uno) | 1 | For flashing and UGS connection |
+| Misc. screws, nuts, zip ties | — | Included in parts kit hardware bag |
 
-## Hardware
+![Printed parts and hardware kit](photos/parts-kit.jpg)
 
-| Component | Notes |
+## Free 3D Model Alternative
+
+If you don't want to buy the paid 3D printed parts kit, you can print your own set for free using this open model instead:
+
+**[Drawing Robot – Arduino Uno + CNC Shield + GRBL by Plexi (Printables.com)](https://www.printables.com/model/137296-drawing-robot-arduino-uno-cnc-shield-grbl/files#preview.file.izH9W)**
+
+The STL files (and enclosure, pen holder, slider, and clamshell parts) are included in this repo under [`3d-models/`](3d-models/drawing-robot-arduino-uno-cnc-shield-grbl-model_files.zip) for convenience.
+
+> ⚠️ **Note:** this free model does **not** include a CNC Shield — you'll need to buy one separately (see [Component List](#component-list) above). The model is designed around an Arduino Uno + CNC Shield combo, so the shield still needs sourcing on its own regardless of which parts kit (paid or free) you use.
+
+## Software / Downloads
+
+| Tool | Link |
 |---|---|
-| Arduino Uno | Main controller |
-| CNC Shield v3 | Stepper driver breakout |
-| 2x Stepper motors | CoreXY belt-driven X/Y |
-| SG90 servo | Pen up/down actuator |
-| Second Arduino (Nano/Uno) | Dedicated servo driver (see below) |
+| GRBL (official) | [github.com/gnea/grbl](https://github.com/gnea/grbl) |
+| grbl-servo fork (pen-lift support) | included in this repo — [`grbl-servo-master.zip`](grbl-servo-master.zip) |
+| Inkscape 0.92 (with Gcodetools) | [inkscape.org/release/inkscape-0.92](https://inkscape.org/release/inkscape-0.92/) |
+| Universal G-code Sender (UGS) | [v2.1.26 release (win64)](https://github.com/winder/Universal-G-Code-Sender/releases/download/v2.1.26/win64-ugs-platform-app-2.1.26.zip) |
 
-![Wiring overview](photos/wiring.jpg)
+![Universal G-code Sender](photos/ugs-logo.png)
 
 ## The Diagonal Movement Problem
 
@@ -55,18 +73,14 @@ Initially, commanding a pure X or Y move caused diagonal pen movement. Root caus
 
 ## Servo Pen-Lift Setup
 
-GRBL has no native servo support — spindle PWM (`M3 Sxxx`) runs at the wrong frequency for a standard hobby servo (SG90 expects 50Hz pulses; GRBL's Timer2 PWM runs at ~1kHz), so driving the servo directly off the spindle pin doesn't work reliably.
+GRBL has no native servo support — spindle PWM (`M3 Sxxx`) runs at the wrong frequency for a standard hobby servo (MG90S/SG90 expect 50Hz pulses; GRBL's Timer2 PWM runs at ~1kHz), so driving the servo directly off the spindle pin doesn't work reliably.
 
-**Solution used:** [`robottini/grbl-servo`](https://github.com/robottini/grbl-servo) — a GRBL fork with native RC-servo pulse generation on the spindle pin.
+**Solution used:** [`grbl-servo`](grbl-servo-master.zip) — a GRBL fork with native RC-servo pulse generation on the spindle pin.
 
 ```
 M3 S60   ; pen up
 M3 S0    ; pen down
 ```
-
-![Servo wiring](photos/servo-wiring.jpg)
-
-Alternative approach (not used in the final build, but included for reference): a second Arduino running [`arduino/servo_trigger.ino`](arduino/servo_trigger.ino), triggered by GRBL's coolant pin (`M8`/`M9`), using the standard `Servo` library for a proper 50Hz signal.
 
 ## G-code Scaling Fix
 
@@ -91,10 +105,10 @@ For text/detailed drawings made of many short strokes, **acceleration matters mo
 ## Final Settings
 
 ```
-$0 = 10       (step pulse, usec)
-$3 = 3        (dir port invert mask)
-$100 = 250.000 (x, step/mm)   ; calibrated via ruler test — adjust for your build
-$101 = 250.000 (y, step/mm)   ; calibrated via ruler test — adjust for your build
+$0 = 10         (step pulse, usec)
+$3 = 3          (dir port invert mask)
+$100 = 250.000  (x, step/mm)     ; calibrated via ruler test — adjust for your build
+$101 = 250.000  (y, step/mm)     ; calibrated via ruler test — adjust for your build
 $110 = 1500.000 (x max rate, mm/min)
 $111 = 1500.000 (y max rate, mm/min)
 $120 = 300.000  (x accel, mm/sec^2)
@@ -103,14 +117,23 @@ $121 = 300.000  (y accel, mm/sec^2)
 
 *(Fill in your actual final values here.)*
 
+## Applications
+
+This machine can be used for:
+
+- ✏️ **Face sketching** — tracing portrait line-art from a bitmap image
+- 🖊️ **Handwriting simulation** — converting typed text into natural-looking handwritten notes
+- 📐 **Diagram making** — plotting technical diagrams, schematics, or hand-drawn-style illustrations
+
 ## Gallery
 
-| | |
+| Machine in action | UGS Visualizer preview |
 |---|---|
-| ![Sample text output](photos/sample-text.jpg) | ![Sample drawing output](photos/sample-drawing.jpg) |
+| ![Machine writing](photos/machine-writing.jpg) | ![UGS visualizer](photos/ugs-visualizer.jpg) |
 
 ## Credits
 
 - [GRBL](https://github.com/gnea/grbl)
-- [robottini/grbl-servo](https://github.com/robottini/grbl-servo)
+- [grbl-servo](grbl-servo-master.zip)
 - [Gcodetools for Inkscape](https://inkscape.org)
+- [EasyDraw V2 3D printed parts kit – shopmakerq.com](https://shopmakerq.com/product/cnc-plotter-3d-printed-parts-kit/?srsltid=AfmBOorJEgRL87GRTpUh_m8fN5zNQv1IVdzcSez_7XhsyYk16ucyBQryKzo)
